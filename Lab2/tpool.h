@@ -106,7 +106,7 @@ public:
 	~ThreadPool() {}
 
 	template<class _R, class _FN, class... _ARGS>
-	std::shared_ptr<TaskFuture<_R>> runAsync(_FN _fn, _ARGS... _args)
+	std::shared_ptr<TaskFuture<_R>> setTask(_FN _fn, _ARGS... _args)
 	{
 		std::function<_R()> rfn = std::bind(_fn, _args...);
 		std::shared_ptr<TaskFuture<_R>> pData(new TaskFuture<_R>());
@@ -121,7 +121,7 @@ public:
 	}
 
 	template<class _FN, class... _ARGS>
-	void runAsync(_FN _fn, _ARGS... _args)
+	void setTask(_FN _fn, _ARGS... _args)
 	{
 		auto pWorker = getFreeWorker();
 		pWorker->appendFn(std::bind(_fn, _args...));

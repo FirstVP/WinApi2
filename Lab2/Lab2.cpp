@@ -6,28 +6,30 @@
 #include "easylogging++.h"
 #include <queue>
 #include <exception>
+#include "Logger.h"
+
+INITIALIZE_EASYLOGGINGPP
 
 typedef std::function<void()> tFunction;
 #define STATUS_NODATA 0
 #define STATUS_DONE 1
 #define STATUS_ERROR 2
 
-template<class T>
-class TaskFuture
-{
-public:
-	int isDone;
-	T data;
-	TaskFuture()
-	{
-		isDone = STATUS_NODATA;
-	}
-};
-
-
 class ThreadPool
 {
 public:
+	
+	template<class T>
+	class TaskFuture
+	{
+	public:
+		int isDone;
+		T data;
+		TaskFuture()
+		{
+			isDone = STATUS_NODATA;
+		}
+	};
 
 	class Worker
 	{
@@ -41,7 +43,6 @@ public:
 			printf("%d before create\n", threadNumber);
 			activationEvent = CreateEventA(NULL, TRUE, FALSE, eventId);
 			printf("%d runned\n", threadNumber);
-			InitializeCriticalSection(&currentFunctionSection);
 			currentFunction = NULL;
 			thread = (HANDLE)_beginthread (&Worker::runWrapper, 0, static_cast<void*>(this));
 			threadId = GetThreadId(thread);
@@ -54,19 +55,6 @@ public:
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
 			CloseHandle(activationEvent);
-		}
-
-		void getRandomString(char *s, const int len) {
-			static const char alphabet[] =
-				"0123456789"
-				"ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				"abcdefghijklmnopqrstuvwxyz";
-			srand(time(0));
-			for (int i = 0; i < len; ++i) {
-				s[i] = alphabet[rand() % (sizeof(alphabet) - 1)];
-			}
-
-			s[len] = 0;
 		}
 
 		bool isFree()
@@ -84,14 +72,13 @@ public:
 
 		void wake()
 		{
-			printf("%d prepare set\n", threadId);
 			SetEvent(activationEvent);
-			printf("%d is set\n", threadId);
+			printf("%d is set\n", threadNumber);
 		}
 
-		bool isEnabled;
+		
 	private:
-	
+		bool isEnabled;
 		HANDLE thread;
 		unsigned threadId;	
 		HANDLE activationEvent;
@@ -124,9 +111,7 @@ public:
 	typedef Worker* pWorker;
 
 	ThreadPool(size_t threads = 1)
-	{
-		isActive = true;
-		InitializeCriticalSection(&queueSection);		
+	{	
 		if (threads <= 0)
 			threads = 1;
 		for (size_t i = 0; i<threads; i++)
@@ -134,19 +119,20 @@ public:
 			pWorker pWorker(new Worker(i));
 			workers.push_back(pWorker);
 		}
+		Logger::writeMessage("Created!");
 	}
 
 	~ThreadPool()
 	{
+		printf("Count: %d\n", workers.size());
 		for (int i = 0; i < workers.size(); i++)
 		{
 			delete workers[i];
 		}
-		DeleteCriticalSection(&queueSection);
 	}
 
 	template<class R, class FN, class... ARGS>
-	std::shared_ptr<TaskFuture<R>> runAsync(FN _fn, ARGS... _args)
+	std::shared_ptr<TaskFuture<R>> setTask(FN _fn, ARGS... _args)
 	{
 		std::function<R()> dataFunction = std::bind(_fn, _args...);
 		std::shared_ptr<TaskFuture<R>> futureData(new TaskFuture<R>());
@@ -180,7 +166,6 @@ public:
 private:
 	void appendTask(tFunction function)
 	{
-		//EnterCriticalSection(&queueSection);
 		pWorker worker = getFreeWorker();
 
 
@@ -192,15 +177,16 @@ private:
 		
 		else
 		{
-			printf("ERROR: NO AVAIABLE THREADS");
+			pWorker pWorker(new Worker(workers.size()));
+			workers.push_back(pWorker);
+			worker = pWorker;
+			worker->setTask(function);
+			worker->wake();
 		}
-		//LeaveCriticalSection(&queueSection);
 	}
 
 	std::vector<pWorker> workers;
 	std::queue<tFunction> tasks;
-	CRITICAL_SECTION queueSection;
-	bool isActive;
 };
 
 int sum(int a, int b)
@@ -221,7 +207,7 @@ int exceptionMulti(int b)
 {	
 	try
 	{
-		throw new std::exception("multi");
+		//throw new std::exception("multi");
 		b = 1;
 	}
 	catch (std::exception* e)
@@ -233,12 +219,15 @@ int exceptionMulti(int b)
 
 int main(int argc, char* argv[])
 {
-	ThreadPool t(2);
-	auto r1 = t.runAsync<int>(&sum, 0, 1);
-	auto r2 = t.runAsync<int>(&sum, 0, 2);
-	auto r3 = t.runAsync<int>(&exceptionMulti, 5);
-	printf("PREPAREWAIT");
-
+	Logger::initializeLogger();
+	ThreadPool t(1);
+	auto r1 = t.setTask<int>(&sum, 0, 1);
+	auto r2 = t.setTask<int>(&sum, 0, 2);
+	auto r3 = t.setTask<int>(&exceptionMulti, 5);
+	auto r4 = t.setTask<int>(&sum, 10, 90);
+	auto r5 = t.setTask<int>(&sum, 11, 55);
+	auto r6 = t.setTask<int>(&sum, 11, 55);
+	auto r7 = t.setTask<int>(&sum, 11, 55);
 
 	while ( (r1->isDone != STATUS_DONE) && (r1->isDone != STATUS_ERROR) )
 	{
@@ -255,12 +244,36 @@ int main(int argc, char* argv[])
 		Sleep(1);
 	}
 
+	while ((r4->isDone != STATUS_DONE) && (r4->isDone != STATUS_ERROR))
+	{
+		Sleep(1);
+	}
+
+	while ((r5->isDone != STATUS_DONE) && (r5->isDone != STATUS_ERROR))
+	{
+		Sleep(1);
+	}
+
+	while ((r6->isDone != STATUS_DONE) && (r6->isDone != STATUS_ERROR))
+	{
+		Sleep(1);
+	}
+
+	while ((r7->isDone != STATUS_DONE) && (r7->isDone != STATUS_ERROR))
+	{
+		Sleep(1);
+	}
+
 	printf("R1: %d\n", r1->data);
 	printf("R2: %d\n", r2->data);
 	printf("R3: %d\n", r3->data);
+	printf("R4: %d\n", r4->data);
+	printf("R5: %d\n", r5->data);
+	printf("R6: %d\n", r6->data);
+	printf("R7: %d\n", r7->data);
 	printf("Status R3: %d\n", r3->isDone);
+	
 	printf("END");
-
-
+	Logger::deinitializeLogger();
 	return 0;
 }

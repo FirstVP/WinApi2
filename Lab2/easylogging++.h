@@ -432,7 +432,7 @@ ELPP_INTERNAL_DEBUGGING_OUT_INFO << ELPP_INTERNAL_DEBUGGING_MSG(internalInfoStre
 #endif  // defined(ELPP_WXWIDGETS_LOGGING)
 // Forward declarations
 namespace el {
-    class Logger;
+    class Logger1;
     class LogMessage;
     class PerformanceTrackingData;
     class Loggers;
@@ -2367,7 +2367,7 @@ namespace base {
         base::type::string_t m_format;
         std::string m_dateTimeFormat;
         base::type::EnumType m_flags;
-        friend class el::Logger;  // To resolve loggerId format specifier easily
+        friend class el::Logger1;  // To resolve loggerId format specifier easily
     };
 }  // namespace base
 /// @brief Resolving function for format specifier
@@ -3420,9 +3420,9 @@ namespace base {
     /// @brief Represents a logger holding ID and configurations we need to write logs
     ///
     /// @detail This class does not write logs itself instead its used by writer to read configuations from.
-    class Logger : public base::threading::ThreadSafe, public Loggable {
+    class Logger1 : public base::threading::ThreadSafe, public Loggable {
     public:
-        Logger(const std::string& id, base::LogStreamsReferenceMap* logStreamsReference) :
+        Logger1(const std::string& id, base::LogStreamsReferenceMap* logStreamsReference) :
         m_id(id),
         m_typedConfigurations(nullptr),
         m_parentApplicationName(std::string()),
@@ -3431,7 +3431,7 @@ namespace base {
             initUnflushedCount();
         }
         
-        Logger(const std::string& id, const Configurations& configurations, base::LogStreamsReferenceMap* logStreamsReference) :
+        Logger1(const std::string& id, const Configurations& configurations, base::LogStreamsReferenceMap* logStreamsReference) :
         m_id(id),
         m_typedConfigurations(nullptr),
         m_parentApplicationName(std::string()),
@@ -3441,7 +3441,7 @@ namespace base {
             configure(configurations);
         }
         
-        Logger(const Logger& logger) {
+        Logger1(const Logger1& logger) {
             base::utils::safeDelete(m_typedConfigurations);
             m_id = logger.m_id;
             m_typedConfigurations = logger.m_typedConfigurations;
@@ -3452,7 +3452,7 @@ namespace base {
             m_logStreamsReference = logger.m_logStreamsReference;
         }
         
-        Logger& operator=(const Logger& logger) {
+        Logger1& operator=(const Logger1& logger) {
             base::utils::safeDelete(m_typedConfigurations);
             m_id = logger.m_id;
             m_typedConfigurations = logger.m_typedConfigurations;
@@ -3464,7 +3464,7 @@ namespace base {
             return *this;
         }
         
-        virtual ~Logger(void) {
+        virtual ~Logger1(void) {
             base::utils::safeDelete(m_typedConfigurations);
         }
         
@@ -3608,7 +3608,7 @@ inline void FUNCTION_NAME(const T&);
         friend class el::base::PerformanceTracker;
         friend class el::base::LogDispatcher;
         
-        Logger(void);
+        Logger1(void);
         
 #if ELPP_VARIADIC_TEMPLATES_SUPPORTED
         template <typename T, typename... Args>
@@ -3649,7 +3649,7 @@ inline void FUNCTION_NAME(const T&);
     };
     namespace base {
         /// @brief Loggers repository
-        class RegisteredLoggers : public base::utils::Registry<Logger, std::string> {
+        class RegisteredLoggers : public base::utils::Registry<Logger1, std::string> {
         public:
             explicit RegisteredLoggers(const LogBuilderPtr& defaultLogBuilder) :
             m_defaultLogBuilder(defaultLogBuilder) {
@@ -3669,16 +3669,16 @@ inline void FUNCTION_NAME(const T&);
                 return &m_defaultConfigurations;
             }
             
-            Logger* get(const std::string& id, bool forceCreation = true) {
+            Logger1* get(const std::string& id, bool forceCreation = true) {
                 base::threading::ScopedLock scopedLock(lock());
-                Logger* logger_ = base::utils::Registry<Logger, std::string>::get(id);
+                Logger1* logger_ = base::utils::Registry<Logger1, std::string>::get(id);
                 if (logger_ == nullptr && forceCreation) {
-                    bool validId = Logger::isValidId(id);
+                    bool validId = Logger1::isValidId(id);
                     if (!validId) {
                         ELPP_ASSERT(validId, "Invalid logger ID [" << id << "]. Not registering this logger.");
                         return nullptr;
                     }
-                    logger_ = new Logger(id, m_defaultConfigurations, &m_logStreamsReference);
+                    logger_ = new Logger1(id, m_defaultConfigurations, &m_logStreamsReference);
                     logger_->m_logBuilder = m_defaultLogBuilder;
                     registerNew(id, logger_);
                 }
@@ -3689,7 +3689,7 @@ inline void FUNCTION_NAME(const T&);
                 if (id == "default") {
                     return false;
                 }
-                Logger* logger = base::utils::Registry<Logger, std::string>::get(id);
+                Logger1* logger = base::utils::Registry<Logger1, std::string>::get(id);
                 if (logger != nullptr) {
                     unregister(logger);
                 }
@@ -3700,9 +3700,9 @@ inline void FUNCTION_NAME(const T&);
                 return get(id, false) != nullptr;
             }
             
-            inline void unregister(Logger*& logger) {
+            inline void unregister(Logger1*& logger) {
                 base::threading::ScopedLock scopedLock(lock());
-                base::utils::Registry<Logger, std::string>::unregister(logger->id());
+                base::utils::Registry<Logger1, std::string>::unregister(logger->id());
             }
             
             inline base::LogStreamsReferenceMap* logStreamsReference(void) {
@@ -3878,7 +3878,7 @@ inline void FUNCTION_NAME(const T&);
     class LogMessage {
     public:
         LogMessage(Level level, const std::string& file, unsigned long int line, const std::string& func,
-                   base::type::VerboseLevel verboseLevel, Logger* logger) :
+                   base::type::VerboseLevel verboseLevel, Logger1* logger) :
         m_level(level), m_file(file), m_line(line), m_func(func),
         m_verboseLevel(verboseLevel), m_logger(logger), m_message(logger->stream().str()) {
         }
@@ -3887,7 +3887,7 @@ inline void FUNCTION_NAME(const T&);
         inline unsigned long int line(void) const { return m_line; } // NOLINT
         inline const std::string& func(void) const { return m_func; }
         inline base::type::VerboseLevel verboseLevel(void) const { return m_verboseLevel; }
-        inline Logger* logger(void) const { return m_logger; }
+        inline Logger1* logger(void) const { return m_logger; }
         inline const base::type::string_t& message(void) const { return m_message; }
     private:
         Level m_level;
@@ -3895,7 +3895,7 @@ inline void FUNCTION_NAME(const T&);
         unsigned long int m_line;
         std::string m_func;
         base::type::VerboseLevel m_verboseLevel;
-        Logger* m_logger;
+        Logger1* m_logger;
         base::type::string_t m_message;
     };
     namespace base {
@@ -3971,7 +3971,7 @@ inline void FUNCTION_NAME(const T&);
                 // Register default logger
                 m_registeredLoggers->get(std::string(base::consts::kDefaultLoggerId));
                 // Register performance logger and reconfigure format
-                Logger* performanceLogger = m_registeredLoggers->get(std::string(base::consts::kPerformanceLoggerId));
+                Logger1* performanceLogger = m_registeredLoggers->get(std::string(base::consts::kPerformanceLoggerId));
                 performanceLogger->configurations()->setGlobally(ConfigurationType::Format, std::string("%datetime %level %msg"));
                 performanceLogger->reconfigure();
 #if defined(ELPP_SYSLOG)
@@ -4605,7 +4605,7 @@ inline void FUNCTION_NAME(const T&);
         class MessageBuilder {
         public:
             MessageBuilder(void) : m_logger(nullptr), m_containerLogSeperator(ELPP_LITERAL("")) {}
-            void initialize(Logger* logger) {
+            void initialize(Logger1* logger) {
                 m_logger = logger;
                 m_containerLogSeperator = ELPP->hasFlag(LoggingFlag::NewLineForContainer) ?
                 ELPP_LITERAL("\n    ") : ELPP_LITERAL(", ");
@@ -4910,7 +4910,7 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
 #undef ELPP_ITERATOR_CONTAINER_LOG_FOUR_ARG
 #undef ELPP_ITERATOR_CONTAINER_LOG_FIVE_ARG
         private:
-            Logger* m_logger;
+            Logger1* m_logger;
             const base::type::char_t* m_containerLogSeperator;
             
             template<class Iterator>
@@ -4978,7 +4978,7 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
                 return *this;
             }
             
-            Writer& construct(Logger* logger, bool needLock = true) {
+            Writer& construct(Logger1* logger, bool needLock = true) {
                 m_logger = logger;
                 initializeLogger(logger->id(), false, needLock);
                 m_messageBuilder.initialize(m_logger);
@@ -5008,7 +5008,7 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
             const unsigned long int m_line;
             const char* m_func;
             base::type::VerboseLevel m_verboseLevel;
-            Logger* m_logger;
+            Logger1* m_logger;
             bool m_proceed;
             base::MessageBuilder m_messageBuilder;
             base::DispatchAction m_dispatchAction;
@@ -5130,7 +5130,7 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
     // Logging from Logger class. Why this is here? Because we have Storage and Writer class available
 #if ELPP_VARIADIC_TEMPLATES_SUPPORTED
     template <typename T, typename... Args>
-    void Logger::log_(Level level, int vlevel, const char* s, const T& value, const Args&... args) {
+    void Logger1::log_(Level level, int vlevel, const char* s, const T& value, const Args&... args) {
         base::MessageBuilder b;
         b.initialize(this);
         while (*s) {
@@ -5151,7 +5151,7 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
         ELPP_INTERNAL_ERROR("Too many arguments provided. Unable to handle. Please provide more format specifiers", false);
     }
     template <typename T>
-    inline void Logger::log_(Level level, int vlevel, const T& log) {
+    inline void Logger1::log_(Level level, int vlevel, const T& log) {
         if (level == Level::Verbose) {
             if (ELPP->vRegistry()->allowed(vlevel, __FILE__)) {
                 base::Writer(Level::Verbose, "FILE", 0, "FUNCTION",
@@ -5164,23 +5164,23 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
         }
     }
     template <typename T, typename... Args>
-    void Logger::log(Level level, const char* s, const T& value, const Args&... args) {
+    void Logger1::log(Level level, const char* s, const T& value, const Args&... args) {
         base::threading::ScopedLock scopedLock(lock());
         log_(level, 0, s, value, args...);
     }
     template <typename T>
-    inline void Logger::log(Level level, const T& log) {
+    inline void Logger1::log(Level level, const T& log) {
         base::threading::ScopedLock scopedLock(lock());
         log_(level, 0, log);
     }
 #   if ELPP_VERBOSE_LOG
     template <typename T, typename... Args>
-    inline void Logger::verbose(int vlevel, const char* s, const T& value, const Args&... args) {
+    inline void Logger1::verbose(int vlevel, const char* s, const T& value, const Args&... args) {
         base::threading::ScopedLock scopedLock(lock());
         log_(el::Level::Verbose, vlevel, s, value, args...);
     }
     template <typename T>
-    inline void Logger::verbose(int vlevel, const T& log) {
+    inline void Logger1::verbose(int vlevel, const T& log) {
         base::threading::ScopedLock scopedLock(lock());
         log_(el::Level::Verbose, vlevel, log);
     }
@@ -5196,20 +5196,20 @@ ELPP_LITERAL("(") << elem->first << ELPP_LITERAL(", ") << elem->second << ELPP_L
 #   endif  // ELPP_VERBOSE_LOG
 #   define LOGGER_LEVEL_WRITERS(FUNCTION_NAME, LOG_LEVEL)\
 template <typename T, typename... Args>\
-inline void Logger::FUNCTION_NAME(const char* s, const T& value, const Args&... args) {\
+inline void Logger1::FUNCTION_NAME(const char* s, const T& value, const Args&... args) {\
 log(LOG_LEVEL, s, value, args...);\
 }\
 template <typename T>\
-inline void Logger::FUNCTION_NAME(const T& value) {\
+inline void Logger1::FUNCTION_NAME(const T& value) {\
 log(LOG_LEVEL, value);\
 }
 #   define LOGGER_LEVEL_WRITERS_DISABLED(FUNCTION_NAME, LOG_LEVEL)\
 template <typename T, typename... Args>\
-inline void Logger::FUNCTION_NAME(const char*, const T&, const Args&...) {\
+inline void Logger1::FUNCTION_NAME(const char*, const T&, const Args&...) {\
 return;\
 }\
 template <typename T>\
-inline void Logger::FUNCTION_NAME(const T&) {\
+inline void Logger1::FUNCTION_NAME(const T&) {\
 return;\
 }
     
@@ -5329,7 +5329,7 @@ writer(level, __FILE__, __LINE__, ELPP_FUNC, dispatchAction).construct(el_getVAL
 #if !defined(ELPP_DISABLE_PERFORMANCE_TRACKING) && ELPP_LOGGING_ENABLED
                 // We store it locally so that if user happen to change configuration by the end of scope
                 // or before calling checkpoint, we still depend on state of configuraton at time of construction
-                el::Logger* loggerPtr = ELPP->registeredLoggers()->get(loggerId, false);
+                el::Logger1* loggerPtr = ELPP->registeredLoggers()->get(loggerId, false);
                 m_enabled = loggerPtr != nullptr && loggerPtr->m_typedConfigurations->performanceTracking(m_level);
                 if (m_enabled) {
                     base::utils::DateTime::gettimeofday(&m_startTime);
@@ -5777,7 +5777,7 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
         /// @brief Converts template to std::string - useful for loggable classes to log containers within log(std::ostream&) const
         template <typename T>
         static std::string convertTemplateToStdString(const T& templ) {
-            el::Logger* logger = 
+            el::Logger1* logger = 
             ELPP->registeredLoggers()->get(el::base::consts::kDefaultLoggerId);
             if (logger == nullptr) {
                 return std::string();
@@ -5811,7 +5811,7 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
         static inline bool hasCustomFormatSpecifier(const char* formatSpecifier) {
             return ELPP->hasCustomFormatSpecifier(formatSpecifier);
         }
-        static inline void validateFileRolling(Logger* logger, Level level) {
+        static inline void validateFileRolling(Logger1* logger, Level level) {
             if (logger == nullptr) return;
             logger->m_typedConfigurations->validateFileRolling(level, ELPP->preRollOutCallback());
         }
@@ -5820,7 +5820,7 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
     class Loggers : base::StaticClass {
     public:
         /// @brief Gets existing or registers new logger
-        static inline Logger* getLogger(const std::string& identity, bool registerIfNotAvailable = true) {
+        static inline Logger1* getLogger(const std::string& identity, bool registerIfNotAvailable = true) {
             base::threading::ScopedLock scopedLock(ELPP->lock());
             return ELPP->registeredLoggers()->get(identity, registerIfNotAvailable);
         }
@@ -5836,19 +5836,19 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
             return ELPP->registeredLoggers()->has(identity);
         }
         /// @brief Reconfigures specified logger with new configurations
-        static inline Logger* reconfigureLogger(Logger* logger, const Configurations& configurations) {
+        static inline Logger1* reconfigureLogger(Logger1* logger, const Configurations& configurations) {
             if (!logger) return nullptr;
             logger->configure(configurations);
             return logger;
         }
         /// @brief Reconfigures logger with new configurations after looking it up using identity
-        static inline Logger* reconfigureLogger(const std::string& identity, const Configurations& configurations) {
+        static inline Logger1* reconfigureLogger(const std::string& identity, const Configurations& configurations) {
             return Loggers::reconfigureLogger(Loggers::getLogger(identity), configurations);
         }
         /// @brief Reconfigures logger's single configuration
-        static inline Logger* reconfigureLogger(const std::string& identity, ConfigurationType configurationType,
+        static inline Logger1* reconfigureLogger(const std::string& identity, ConfigurationType configurationType,
                                                 const std::string& value) {
-            Logger* logger = Loggers::getLogger(identity);
+            Logger1* logger = Loggers::getLogger(identity);
             if (logger == nullptr) {
                 return nullptr;
             }
@@ -5872,7 +5872,7 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
                                                  const std::string& value) {
             for (base::RegisteredLoggers::iterator it = ELPP->registeredLoggers()->begin();
                  it != ELPP->registeredLoggers()->end(); ++it) {
-                Logger* logger = it->second;
+                Logger1* logger = it->second;
                 logger->configurations()->set(level, configurationType, value);
                 logger->reconfigure();
             }
@@ -5915,7 +5915,7 @@ el::base::type::ostream_t& operator<<(el::base::type::ostream_t& OutputStreamIns
                         << "] for parsing.");
             std::string line = std::string();
             std::stringstream ss;
-            Logger* logger = nullptr;
+            Logger1* logger = nullptr;
             auto configure = [&](void) {
                 ELPP_INTERNAL_INFO(8, "Configuring logger: '" << logger->id() << "' with configurations \n" << ss.str() 
                                    << "\n--------------");
