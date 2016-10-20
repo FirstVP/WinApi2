@@ -13,28 +13,32 @@ Logger::~Logger()
 }
 
 void Logger::initializeLogger()
-	{
-		InitializeCriticalSection(&outputSection);
-	}
+{
+#ifdef __linux__ 
+	pthread_mutex_init(&outputSection, NULL);
+#else
+	InitializeCriticalSection(&outputSection);
+#endif
+}
 void Logger::deinitializeLogger()
-	{
-		DeleteCriticalSection(&outputSection);
-	}
+{
+	DeleteCriticalSection(&outputSection);
+}
 void Logger::writeMessage(char* message)
-	{
-		EnterCriticalSection(&outputSection);
-		LOG(INFO) << message;
-		LeaveCriticalSection(&outputSection);
-	}
+{
+	EnterCriticalSection(&outputSection);
+	LOG(INFO) << message;
+	LeaveCriticalSection(&outputSection);
+}
 void Logger::writeWarning(char* message)
-	{
-		EnterCriticalSection(&outputSection);
-		LOG(WARNING) << message;
-		LeaveCriticalSection(&outputSection);
-	}
+{
+	EnterCriticalSection(&outputSection);
+	LOG(WARNING) << message;
+	LeaveCriticalSection(&outputSection);
+}
 void Logger::writeError(char* message)
-	{
-		EnterCriticalSection(&outputSection);
-		LOG(ERROR) << message;
-		LeaveCriticalSection(&outputSection);
-	}
+{
+	EnterCriticalSection(&outputSection);
+	LOG(ERROR) << message;
+	LeaveCriticalSection(&outputSection);
+}

@@ -1,8 +1,14 @@
 // Lab2.cpp: определяет точку входа для консольного приложения.
 //
 
-#include "stdafx.h"
+
+#ifdef __linux__ 
+#include "unistd.h"
+#else
 #include "process.h"
+#endif
+
+#include <functional>
 #include "easylogging++.h"
 #include <queue>
 #include <exception>
@@ -20,7 +26,7 @@ typedef std::function<void()> tFunction;
 class ThreadPool
 {
 public:
-	
+
 	template<class T>
 	class TaskFuture
 	{
@@ -37,23 +43,33 @@ public:
 	{
 	public:
 
-		Worker(int number): isEnabled(true)
-		{ 	
+		Worker(int number) : isEnabled(true)
+		{
 			threadNumber = number;
 			sprintf(eventId, "%d", number);
-			activationEvent = CreateEventA(NULL, TRUE, FALSE, eventId);
 			currentFunction = NULL;
-			thread = (HANDLE)_beginthread (&Worker::runWrapper, 0, static_cast<void*>(this));
-			threadId = GetThreadId(thread);
+#ifdef __linux__
+			pthread_mutex_init(&activationEventMutex, NULL);
+			pthread_cond_init(&activationEvent, NULL);
+			condition = false;
+			pthread_create(&thread, NULL, runWrapper, static_cast<void*>(this));
+#else
+			activationEvent = CreateEventA(NULL, TRUE, FALSE, eventId);
+			thread = (HANDLE)_beginthread(&Worker::runWrapper, 0, static_cast<void*>(this));
+#endif
 		}
 
 		~Worker()
 		{
 			isEnabled = false;
-			SetEvent(activationEvent);		
+			wake();
+#ifdef __linux__                        
+			pthread_join(thread, NULL);
+#else		
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
 			CloseHandle(activationEvent);
+#endif
 		}
 
 		int getThreadNumber()
@@ -76,46 +92,76 @@ public:
 
 		void wake()
 		{
+#ifdef __linux__ 
+			pthread_mutex_lock(&activationEventMutex);
+			condition = true;
+			pthread_cond_signal(&activationEvent);
+			pthread_mutex_unlock(&activationEventMutex);
+#else
 			SetEvent(activationEvent);
-			printf("%d is set\n", threadNumber);
+#endif    
 		}
 
-		
+
 	private:
-		bool isEnabled;
+
+#ifdef __linux__ 
+		pthread_t thread;
+		pthread_mutex_t activationEventMutex;
+		pthread_cond_t activationEvent;
+		bool condition;
+#else
 		HANDLE thread;
-		unsigned threadId;	
 		HANDLE activationEvent;
+#endif
+
+		bool isEnabled;
+		unsigned threadId;
 		char eventId[256];
 		tFunction currentFunction;
-		CRITICAL_SECTION currentFunctionSection;
 		int threadNumber;
 
 		void run()
-		{		
+		{
 			while (isEnabled)
 			{
-				//printf("%d wait\n", threadId);
+#ifdef __linux__ 
+				pthread_mutex_lock(&activationEventMutex);
+				while (condition == false)
+				{
+					pthread_cond_wait(&activationEvent, &activationEventMutex);
+				}
+				condition = false;
+				pthread_mutex_unlock(&activationEventMutex);
+#else
 				WaitForSingleObject(activationEvent, INFINITE);
-				//printf("%d go\n", threadId);
 				ResetEvent(activationEvent);
+#endif
 				if (currentFunction != NULL)
 					currentFunction();
 				currentFunction = NULL;
 			}
-			//printf("%d finish\n", threadId);		
 		}
 
+
+#ifdef __linux__ 
+		static void* runWrapper(void* pArguments)
+		{
+			static_cast<Worker*>(pArguments)->run();
+		}
+#else
 		static void runWrapper(void* pArguments)
 		{
 			static_cast<Worker*>(pArguments)->run();
-		}		
+		}
+#endif              				
 	};
 
 	typedef Worker* pWorker;
 
 	ThreadPool(size_t threads = 1)
-	{	
+	{
+		Logger::initializeLogger();
 		if (threads <= 0)
 			threads = 1;
 		for (size_t i = 0; i<threads; i++)
@@ -132,11 +178,11 @@ public:
 
 	~ThreadPool()
 	{
-		printf("ALL THREADS %d\n", workers.size());
 		for (int i = 0; i < workers.size(); i++)
 		{
 			delete workers[i];
 		}
+		Logger::deinitializeLogger();
 	}
 
 	template<class R, class FN, class... ARGS>
@@ -150,12 +196,12 @@ public:
 			{
 				futureData->data = dataFunction();
 				futureData->isDone = STATUS_DONE;
-				printf("DONE thr %d\n", GetCurrentThreadId());
 			}
 			catch (std::exception* e)
 			{
-				futureData->isDone = STATUS_ERROR;		
-			}							
+				Logger::writeError("Task has been aborted");
+				futureData->isDone = STATUS_ERROR;
+			}
 		};
 		appendTask(function);
 		return futureData;
@@ -173,14 +219,15 @@ public:
 
 private:
 	void appendTask(tFunction function)
-	{		
+	{
 		pWorker worker = getFreeWorker();
 		if (worker == NULL)
 		{
 			worker = createNewWorker();
+			Logger::writeWarning("New worker has been added");
 		}
 
-		char message[] = "New task has been added (%d thread)";
+		char message[] = "New task has been added";
 		char buffer[BUFFER_SIZE];
 		sprintf(buffer, message, worker->getThreadNumber());
 		Logger::writeMessage(buffer);
@@ -205,7 +252,7 @@ int sum(int a, int b)
 	int result = 0;
 	try
 	{
-		Sleep(1000);
+		Sleep(1);
 		result = a + b;
 	}
 	catch (std::exception* e)
@@ -216,10 +263,10 @@ int sum(int a, int b)
 }
 
 int exceptionMulti(int b)
-{	
+{
 	try
 	{
-		throw new std::exception("multi");
+		throw new std::exception();
 		b = 1;
 	}
 	catch (std::exception* e)
@@ -231,17 +278,15 @@ int exceptionMulti(int b)
 
 int main(int argc, char* argv[])
 {
-	Logger::initializeLogger();
-	ThreadPool t(1);
-	auto r1 = t.setTask<int>(&sum, 0, 1);
-	auto r2 = t.setTask<int>(&sum, 0, 2);
-	auto r3 = t.setTask<int>(&exceptionMulti, 5);
-	auto r4 = t.setTask<int>(&sum, 10, 90);
-	auto r5 = t.setTask<int>(&sum, 11, 55);
-	auto r6 = t.setTask<int>(&sum, 11, 55);
-	auto r7 = t.setTask<int>(&sum, 11, 55);
+	ThreadPool* t = new ThreadPool(1);
+	auto r1 = t->setTask<int>(&sum, 0, 1);
+	auto r2 = t->setTask<int>(&exceptionMulti, 1);
+	auto r3 = t->setTask<int>(&sum, 2, 1);
+	auto r4 = t->setTask<int>(&sum, 5, 5);
+	auto r5 = t->setTask<int>(&sum, 7, 7);
+	auto r6 = t->setTask<int>(&sum, 10, 10);
 
-	while ( (r1->isDone != STATUS_DONE) && (r1->isDone != STATUS_ERROR) )
+	while ((r1->isDone != STATUS_DONE) && (r1->isDone != STATUS_ERROR))
 	{
 		Sleep(1);
 	}
@@ -271,21 +316,13 @@ int main(int argc, char* argv[])
 		Sleep(1);
 	}
 
-	while ((r7->isDone != STATUS_DONE) && (r7->isDone != STATUS_ERROR))
-	{
-		Sleep(1);
-	}
-
 	printf("R1: %d\n", r1->data);
 	printf("R2: %d\n", r2->data);
 	printf("R3: %d\n", r3->data);
 	printf("R4: %d\n", r4->data);
 	printf("R5: %d\n", r5->data);
 	printf("R6: %d\n", r6->data);
-	printf("R7: %d\n", r7->data);
-	printf("Status R3: %d\n", r3->isDone);
-	
+	delete t;
 	printf("END");
-	Logger::deinitializeLogger();
 	return 0;
 }
