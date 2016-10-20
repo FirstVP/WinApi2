@@ -15,6 +15,8 @@ typedef std::function<void()> tFunction;
 #define STATUS_DONE 1
 #define STATUS_ERROR 2
 
+#define BUFFER_SIZE 256
+
 class ThreadPool
 {
 public:
@@ -39,10 +41,7 @@ public:
 		{ 	
 			threadNumber = number;
 			sprintf(eventId, "%d", number);
-			printf("%s worker\n", eventId);
-			printf("%d before create\n", threadNumber);
 			activationEvent = CreateEventA(NULL, TRUE, FALSE, eventId);
-			printf("%d runned\n", threadNumber);
 			currentFunction = NULL;
 			thread = (HANDLE)_beginthread (&Worker::runWrapper, 0, static_cast<void*>(this));
 			threadId = GetThreadId(thread);
@@ -55,6 +54,11 @@ public:
 			WaitForSingleObject(thread, INFINITE);
 			CloseHandle(thread);
 			CloseHandle(activationEvent);
+		}
+
+		int getThreadNumber()
+		{
+			return threadNumber;
 		}
 
 		bool isFree()
@@ -91,15 +95,15 @@ public:
 		{		
 			while (isEnabled)
 			{
-				printf("%d wait\n", threadId);
+				//printf("%d wait\n", threadId);
 				WaitForSingleObject(activationEvent, INFINITE);
-				printf("%d go\n", threadId);
+				//printf("%d go\n", threadId);
 				ResetEvent(activationEvent);
 				if (currentFunction != NULL)
 					currentFunction();
 				currentFunction = NULL;
 			}
-			printf("%d finish\n", threadId);		
+			//printf("%d finish\n", threadId);		
 		}
 
 		static void runWrapper(void* pArguments)
@@ -119,12 +123,16 @@ public:
 			pWorker pWorker(new Worker(i));
 			workers.push_back(pWorker);
 		}
-		Logger::writeMessage("Created!");
+
+		char message[] = "Initialization, %d threads have been created";
+		char buffer[BUFFER_SIZE];
+		sprintf(buffer, message, workers.size());
+		Logger::writeMessage(buffer);
 	}
 
 	~ThreadPool()
 	{
-		printf("Count: %d\n", workers.size());
+		printf("ALL THREADS %d\n", workers.size());
 		for (int i = 0; i < workers.size(); i++)
 		{
 			delete workers[i];
@@ -165,24 +173,27 @@ public:
 
 private:
 	void appendTask(tFunction function)
-	{
+	{		
 		pWorker worker = getFreeWorker();
-
-
-		if (worker != NULL)
+		if (worker == NULL)
 		{
-			worker->setTask(function);
-			worker->wake();
+			worker = createNewWorker();
 		}
-		
-		else
-		{
-			pWorker pWorker(new Worker(workers.size()));
-			workers.push_back(pWorker);
-			worker = pWorker;
-			worker->setTask(function);
-			worker->wake();
-		}
+
+		char message[] = "New task has been added (%d thread)";
+		char buffer[BUFFER_SIZE];
+		sprintf(buffer, message, worker->getThreadNumber());
+		Logger::writeMessage(buffer);
+
+		worker->setTask(function);
+		worker->wake();
+	}
+
+	pWorker createNewWorker()
+	{
+		pWorker pWorker(new Worker(workers.size()));
+		workers.push_back(pWorker);
+		return pWorker;
 	}
 
 	std::vector<pWorker> workers;
@@ -194,6 +205,7 @@ int sum(int a, int b)
 	int result = 0;
 	try
 	{
+		Sleep(1000);
 		result = a + b;
 	}
 	catch (std::exception* e)
@@ -207,7 +219,7 @@ int exceptionMulti(int b)
 {	
 	try
 	{
-		//throw new std::exception("multi");
+		throw new std::exception("multi");
 		b = 1;
 	}
 	catch (std::exception* e)
