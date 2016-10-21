@@ -27,13 +27,10 @@
     <ClInclude Include="easylogging++.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
-    <ClInclude Include="threadpool.h">
-      <Filter>Заголовочные файлы</Filter>
-    </ClInclude>
-    <ClInclude Include="tpool.h">
-      <Filter>Заголовочные файлы</Filter>
-    </ClInclude>
     <ClInclude Include="Logger.h">
+      <Filter>Заголовочные файлы</Filter>
+    </ClInclude>
+    <ClInclude Include="ThreadPool.h">
       <Filter>Заголовочные файлы</Filter>
     </ClInclude>
   </ItemGroup>
