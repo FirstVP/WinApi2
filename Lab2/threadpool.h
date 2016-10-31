@@ -199,13 +199,14 @@ public:
 			catch (std::exception* e)
 			{			
 				Logger::writeError("Task has been aborted");
-				Logger::turnOnFileOutput();
 				futureData->isDone = STATUS_ERROR;
 			}
 		};
 		appendTask(function);
 		return futureData;
 	}
+
+	private:
 
 	pWorker getFreeWorker()
 	{
@@ -217,7 +218,6 @@ public:
 		return NULL;
 	}
 
-private:
 	void appendTask(tFunction function)
 	{
 		pWorker worker = getFreeWorker();
@@ -247,5 +247,5 @@ private:
 	}
 
 	std::vector<pWorker> workers;
-	std::queue<tFunction> tasks;
+	//std::queue<tFunction> tasks;
 };
